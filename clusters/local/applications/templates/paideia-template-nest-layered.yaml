@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: paideia-template-nest-layered-local
+  namespace: argocd
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: paideia-template-nest-layered
+
+  sources:
+    - repoURL: https://github.com/paideia-code/paideia-infra-platform.git
+      targetRevision: main
+      path: charts/application
+      helm:
+        releaseName: paideia-template-nest-layered
+        valueFiles:
+          - $values/templates/paideia-template-nest-layered/kubernetes/local/values.yaml
+
+    - repoURL: https://github.com/paideia-code/paideia-infra-environments.git
+      targetRevision: main
+      ref: values
+      path: templates/paideia-template-nest-layered/kubernetes/local
+      directory:
+        include: namespace.yaml
