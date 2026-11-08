@@ -1,0 +1,8 @@
+image:
+  repository: paideia-template-nest-layered
+  tag: "0.0.1"
+
+port: 3000
+
+env:
+  PORT: "3000"

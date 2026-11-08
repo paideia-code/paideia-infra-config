@@ -1,0 +1,12 @@
+**/.env
+**/.env.*
+!**/.env.example
+
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+!**/*.tfvars.example
+**/*.tfplan
+**/crash.log
+**/.local/
