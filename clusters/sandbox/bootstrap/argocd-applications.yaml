@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sandbox-applications
+  namespace: argocd
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  source:
+    repoURL: https://github.com/paideia-code/paideia-infra-environments.git
+    targetRevision: main
+    path: clusters/sandbox/applications
+    directory:
+      recurse: true
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
