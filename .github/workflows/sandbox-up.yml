@@ -24,7 +24,7 @@ jobs:
 
   up:
     needs: verify
-    uses: paideia-code/paideia-infra-automations/.github/workflows/eks-up.yml@v0.7.0
+    uses: paideia-code/paideia-infra-automations/.github/workflows/eks-up.yml@v0.7.1
     with:
       cluster-directory: clusters/sandbox
       cluster-name: paideia-code-sandbox
