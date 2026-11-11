@@ -12,7 +12,39 @@ module "eks" {
   endpoint_public_access_cidrs = [var.admin_cidr]
 
   authentication_mode                      = "API"
-  enable_cluster_creator_admin_permissions = true
+  enable_cluster_creator_admin_permissions = false
+
+  access_entries = {
+    cluster_creator = {
+      principal_arn = "arn:aws:iam::689060328245:role/managed/AccountFullAccessRole"
+      type          = "STANDARD"
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+
+    sandbox_operator = {
+      principal_arn = "arn:aws:iam::689060328245:user/paideia-github-actions-sandbox-operator"
+      type          = "STANDARD"
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
 
   enable_irsa       = false
   create_kms_key    = false
