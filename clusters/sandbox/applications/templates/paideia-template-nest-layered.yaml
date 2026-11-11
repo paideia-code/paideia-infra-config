@@ -25,3 +25,9 @@ spec:
       path: templates/paideia-template-nest-layered/kubernetes/sandbox
       directory:
         include: namespace.yaml
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
