@@ -4,12 +4,18 @@ module "eks" {
   name               = "paideia-code-sandbox"
   kubernetes_version = "1.37"
 
+  create_iam_role = false
+  iam_role_arn    = data.aws_iam_role.sandbox_cluster.arn
+
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.public_subnets
 
-  endpoint_private_access      = true
-  endpoint_public_access       = true
-  endpoint_public_access_cidrs = [var.admin_cidr]
+  endpoint_private_access = true
+  endpoint_public_access  = true
+  endpoint_public_access_cidrs = distinct(compact([
+    var.admin_cidr,
+    var.automation_cidr
+  ]))
 
   authentication_mode                      = "API"
   enable_cluster_creator_admin_permissions = false
@@ -69,8 +75,10 @@ module "eks" {
 
   eks_managed_node_groups = {
     general = {
-      name          = "paideia-code-sandbox-general"
-      iam_role_name = "paideia-code-sandbox-node"
+      name = "paideia-code-sandbox-general"
+
+      create_iam_role = false
+      iam_role_arn    = data.aws_iam_role.sandbox_node.arn
 
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["c7i-flex.large"]
@@ -79,8 +87,6 @@ module "eks" {
       min_size     = 1
       max_size     = 1
       desired_size = 1
-
-      iam_role_attach_cni_policy = true
 
       block_device_mappings = {
         root = {
