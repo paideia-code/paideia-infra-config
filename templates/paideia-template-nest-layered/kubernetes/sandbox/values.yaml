@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 689060328245.dkr.ecr.us-east-2.amazonaws.com/paideia-template-nest-layered
-  tag: "sha-7ee725942a336c7df85e9df82dda121426e0ad3e"
+  tag: "sha-652bf4c163e88f15b71e4a847826a032e36427ec"
 
 port: 3000
 
