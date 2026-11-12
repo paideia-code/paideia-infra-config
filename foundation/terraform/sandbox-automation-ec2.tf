@@ -158,6 +158,66 @@ resource "aws_iam_policy" "sandbox_ec2_access" {
         Condition = local.sandbox_ec2_existing_conditions
       },
       {
+        Sid       = "UseTaggedSandboxLaunchTemplates"
+        Effect    = "Allow"
+        Action    = "ec2:RunInstances"
+        Resource  = "${local.sandbox_ec2_prefix}:launch-template/*"
+        Condition = local.sandbox_ec2_existing_conditions
+      },
+      {
+        Sid    = "UseTaggedSandboxNetworkForNodes"
+        Effect = "Allow"
+        Action = "ec2:RunInstances"
+        Resource = [
+          "${local.sandbox_ec2_prefix}:subnet/*",
+          "${local.sandbox_ec2_prefix}:security-group/*"
+        ]
+        Condition = merge(
+          local.sandbox_ec2_existing_conditions,
+          {
+            ArnLike = {
+              "ec2:LaunchTemplate" = "${local.sandbox_ec2_prefix}:launch-template/*"
+            }
+          }
+        )
+      },
+      {
+        Sid    = "LaunchSandboxNodeResources"
+        Effect = "Allow"
+        Action = "ec2:RunInstances"
+        Resource = [
+          "arn:aws:ec2:us-east-2::image/*",
+          "${local.sandbox_ec2_prefix}:instance/*",
+          "${local.sandbox_ec2_prefix}:volume/*",
+          "${local.sandbox_ec2_prefix}:network-interface/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = "us-east-2"
+          }
+          ArnLike = {
+            "ec2:LaunchTemplate" = "${local.sandbox_ec2_prefix}:launch-template/*"
+          }
+        }
+      },
+      {
+        Sid    = "TagSandboxNodeResourcesOnLaunch"
+        Effect = "Allow"
+        Action = "ec2:CreateTags"
+        Resource = [
+          "${local.sandbox_ec2_prefix}:instance/*",
+          "${local.sandbox_ec2_prefix}:volume/*",
+          "${local.sandbox_ec2_prefix}:network-interface/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = "us-east-2"
+            "ec2:CreateAction"    = "RunInstances"
+            "aws:RequestTag/Name" = "paideia-code-sandbox-general"
+          }
+        }
+      },
+      {
         Sid      = "ReadPublicEksAmiRelease"
         Effect   = "Allow"
         Action   = "ssm:GetParameter"
