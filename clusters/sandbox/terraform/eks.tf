@@ -68,9 +68,16 @@ module "eks" {
   addons = {
     vpc-cni = {
       before_compute = true
+      addon_version  = "v1.23.3-eksbuild.1"
     }
-    kube-proxy = {}
-    coredns    = {}
+
+    kube-proxy = {
+      addon_version = "v1.37.0-eksbuild.39"
+    }
+
+    coredns = {
+      addon_version = "v1.14.7-eksbuild.35"
+    }
   }
 
   eks_managed_node_groups = {
