@@ -32,6 +32,12 @@ resource "aws_iam_policy" "sandbox_iam_access" {
         )
       },
       {
+        Sid      = "ReadSandboxNodeRolePolicies"
+        Effect   = "Allow"
+        Action   = "iam:ListAttachedRolePolicies"
+        Resource = aws_iam_role.sandbox_node.arn
+      },
+      {
         Sid      = "PassClusterRoleToEks"
         Effect   = "Allow"
         Action   = "iam:PassRole"
