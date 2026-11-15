@@ -1,5 +1,10 @@
 fullnameOverride: argocd
 
+configs:
+  secret:
+    # Contraseña pública de este laboratorio local: admin.
+    argocdServerAdminPassword: '$2a$10$Y8drUddBcmGF6i9zXfl/T.3f6k4rU8aQpj.YwIlx4JJA2QtgBprv6'
+
 server:
   service:
     type: ClusterIP
