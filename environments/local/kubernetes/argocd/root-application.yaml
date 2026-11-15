@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-applications
+  namespace: argocd
+  
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/paideia-code/paideia-infra-config.git
+    targetRevision: main
+    path: environments/local/kubernetes/argocd/applications
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false

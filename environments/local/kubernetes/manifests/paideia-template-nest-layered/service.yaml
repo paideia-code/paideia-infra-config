@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: paideia-template-nest-layered
+  namespace: paideia-template-nest-layered
+spec:
+  type: ClusterIP
+  selector:
+    app: paideia-template-nest-layered
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
