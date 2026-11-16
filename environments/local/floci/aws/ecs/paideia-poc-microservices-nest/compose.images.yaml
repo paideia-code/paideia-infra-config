@@ -1,0 +1,14 @@
+name: paideia-poc-microservices-nest-images
+
+services:
+  courses:
+    image: localhost:4566/000000000000/${AWS_REGION:?Configura AWS_REGION}/paideia-poc-microservices-nest-courses:${TF_VAR_courses_version:?Configura TF_VAR_courses_version}
+    build:
+      context: "${MICROSERVICES_PATH:?Configura MICROSERVICES_PATH}/courses"
+      target: runtime
+
+  courses-migrate:
+    image: localhost:4566/000000000000/${AWS_REGION:?Configura AWS_REGION}/paideia-poc-microservices-nest-courses-migrate:${TF_VAR_courses_version:?Configura TF_VAR_courses_version}
+    build:
+      context: "${MICROSERVICES_PATH:?Configura MICROSERVICES_PATH}/courses"
+      target: migrate

@@ -1,0 +1,2 @@
+# El ejemplo se copia a .env y se carga con source en Bash.
+.env.example text eol=lf
