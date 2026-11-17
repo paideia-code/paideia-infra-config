@@ -1,0 +1,190 @@
+name: Sandbox AWS / EKS + Argo CD - Levantar
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paideia-sandbox-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    uses: paideia-code/paideia-infra-automations/.github/workflows/aws-identity-check.yml@v0.9.0
+    with:
+      aws-region: ${{ vars.AWS_REGION }}
+      aws-account-id: ${{ vars.AWS_ACCOUNT_ID }}
+      expected-principal-arn: arn:aws:iam::689060328245:user/paideia-github-actions-sandbox-operator
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SANDBOX_OPERATOR_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SANDBOX_OPERATOR_SECRET_ACCESS_KEY }}
+
+  up:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      ENVIRONMENT_DIR: environments/sandbox/aws/eks-argocd
+      CLUSTER_NAME: paideia-code-sandbox
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_admin_cidr: ${{ vars.SANDBOX_ADMIN_CIDR }}
+      HELM_VERSION: 4.3.1
+      KUBECTL_VERSION: 1.36.1
+      ARGOCD_CHART_VERSION: 10.17.0
+      AWS_PAGER: ""
+
+    steps:
+      - name: Obtener la configuracion del ambiente
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Autenticar en AWS
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_SANDBOX_OPERATOR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SANDBOX_OPERATOR_SECRET_ACCESS_KEY }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          force-skip-oidc: true
+
+      - name: Preparar Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Preparar kubectl y Helm
+        run: |
+          cd "$(mktemp -d)"
+          mkdir -p "$RUNNER_TEMP/bin"
+
+          kubectl_url="https://dl.k8s.io/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl"
+          curl -fsSL --retry 3 "$kubectl_url" -o kubectl
+          curl -fsSL --retry 3 "$kubectl_url.sha256" -o kubectl.sha256
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          install -m 0755 kubectl "$RUNNER_TEMP/bin/kubectl"
+
+          archive="helm-v$HELM_VERSION-linux-amd64.tar.gz"
+          curl -fsSL --retry 3 "https://get.helm.sh/$archive" -o "$archive"
+          curl -fsSL --retry 3 "https://get.helm.sh/$archive.sha256sum" -o "$archive.sha256sum"
+          sha256sum --check "$archive.sha256sum"
+          tar -xzf "$archive"
+          install -m 0755 linux-amd64/helm "$RUNNER_TEMP/bin/helm"
+
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Inicializar y validar Terraform
+        id: init
+        run: |
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" init -lockfile=readonly
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" fmt -check
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" validate
+
+      - name: Obtener la IP temporal del runner
+        id: runner_ip
+        run: |
+          runner_ip="$(curl -4 -fsS --retry 3 https://checkip.amazonaws.com)"
+          python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1])' "$runner_ip"
+          echo "TF_VAR_automation_cidr=$runner_ip/32" >> "$GITHUB_ENV"
+
+      - name: Preparar el plan de arranque
+        run: |
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" plan \
+            -lock-timeout=5m -out="$RUNNER_TEMP/up.tfplan"
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" show \
+            -json "$RUNNER_TEMP/up.tfplan" > "$RUNNER_TEMP/up.json"
+
+          if ! jq -e '
+            [.resource_changes[]?
+              | select(.mode == "managed")
+              | select(.change.actions | index("delete"))
+            ] | length == 0
+          ' "$RUNNER_TEMP/up.json" > /dev/null; then
+            echo "El arranque rechaza planes con eliminaciones o reemplazos." >&2
+            exit 1
+          fi
+
+      - name: Aplicar el plan de arranque
+        id: apply
+        timeout-minutes: 45
+        run: |
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" apply \
+            -lock-timeout=5m "$RUNNER_TEMP/up.tfplan"
+
+      - name: Instalar Argo CD y registrar la aplicacion raiz
+        timeout-minutes: 25
+        env:
+          KUBECONFIG: ${{ runner.temp }}/kubeconfig
+        run: |
+          actual_name="$(terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" output -raw eks_cluster_name)"
+          [[ "$actual_name" == "$CLUSTER_NAME" ]]
+
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --alias "$CLUSTER_NAME"
+          for attempt in $(seq 1 18); do
+            if kubectl --request-timeout=10s get nodes; then
+              break
+            fi
+            echo "Esperando acceso a Kubernetes: intento $attempt/18"
+            sleep 10
+          done
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
+          helm upgrade --install argocd argo/argo-cd \
+            --version "$ARGOCD_CHART_VERSION" \
+            --namespace argocd --create-namespace \
+            -f "$ENVIRONMENT_DIR/argocd/values.yaml" \
+            --wait --timeout 10m
+
+          root_app="$(kubectl apply -f "$ENVIRONMENT_DIR/argocd/root-application.yaml" -o name)"
+          kubectl -n argocd wait "$root_app" \
+            --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s
+          kubectl -n argocd wait applications --all \
+            --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s
+          kubectl -n argocd wait applications --all \
+            --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s
+          kubectl -n argocd get applications
+          echo "EKS y Argo CD preparados; Applications Synced y Healthy." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retirar el acceso temporal del runner
+        if: ${{ always() && steps.init.outcome == 'success' && steps.runner_ip.outcome == 'success' && steps.apply.outcome != 'skipped' }}
+        timeout-minutes: 15
+        run: |
+          unset TF_VAR_automation_cidr
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" plan \
+            -lock-timeout=5m -out="$RUNNER_TEMP/cleanup.tfplan"
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" show \
+            -json "$RUNNER_TEMP/cleanup.tfplan" > "$RUNNER_TEMP/cleanup.json"
+
+          if ! jq -e --arg cluster "$CLUSTER_NAME" --arg admin "$TF_VAR_admin_cidr" '
+            all(.resource_changes[]? | select(.mode == "managed");
+              .change.actions == ["no-op"] or (
+                .type == "aws_eks_cluster" and
+                .change.actions == ["update"] and
+                .change.before.name == $cluster and
+                .change.after.name == $cluster and
+                (.change.before | del(.vpc_config)) == (.change.after | del(.vpc_config)) and
+                (.change.before.vpc_config | map(del(.public_access_cidrs))) ==
+                  (.change.after.vpc_config | map(del(.public_access_cidrs))) and
+                .change.after.vpc_config[0].public_access_cidrs == [$admin]
+              )
+            )
+          ' "$RUNNER_TEMP/cleanup.json" > /dev/null; then
+            echo "La limpieza detecto otros cambios. Revisa el plan; la IP temporal puede seguir autorizada." >&2
+            exit 1
+          fi
+
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" apply \
+            -lock-timeout=5m "$RUNNER_TEMP/cleanup.tfplan"
+          echo "Acceso temporal del runner retirado." >> "$GITHUB_STEP_SUMMARY"

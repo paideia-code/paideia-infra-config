@@ -2,7 +2,7 @@ output "container_repositories" {
   description = "Direcciones ECR por aplicación."
 
   value = {
-    for name, repository in module.container_registries :
+    for name, repository in aws_ecr_repository.applications :
     name => repository.repository_url
   }
 }
@@ -15,14 +15,4 @@ output "ecr_publisher_user_name" {
 output "terraform_state_bucket_name" {
   description = "Bucket privado para almacenar estados de Terraform."
   value       = aws_s3_bucket.terraform_state.id
-}
-
-output "sandbox_cluster_role_arn" {
-  description = "ARN del rol persistente del cluster EKS de sandbox."
-  value       = aws_iam_role.sandbox_cluster.arn
-}
-
-output "sandbox_node_role_arn" {
-  description = "ARN del rol persistente de los nodos EKS de sandbox."
-  value       = aws_iam_role.sandbox_node.arn
 }

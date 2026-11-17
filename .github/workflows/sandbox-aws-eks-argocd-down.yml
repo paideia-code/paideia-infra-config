@@ -1,0 +1,116 @@
+name: Sandbox AWS / EKS + Argo CD - Retirar
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Escribe paideia-code-sandbox para confirmar la retirada
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paideia-sandbox-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    uses: paideia-code/paideia-infra-automations/.github/workflows/aws-identity-check.yml@v0.9.0
+    with:
+      aws-region: ${{ vars.AWS_REGION }}
+      aws-account-id: ${{ vars.AWS_ACCOUNT_ID }}
+      expected-principal-arn: arn:aws:iam::689060328245:user/paideia-github-actions-sandbox-operator
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SANDBOX_OPERATOR_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SANDBOX_OPERATOR_SECRET_ACCESS_KEY }}
+
+  down:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      ENVIRONMENT_DIR: environments/sandbox/aws/eks-argocd
+      CLUSTER_NAME: paideia-code-sandbox
+      CONFIRMATION: ${{ inputs.confirmation }}
+      TF_VAR_admin_cidr: ${{ vars.SANDBOX_ADMIN_CIDR }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      AWS_PAGER: ""
+
+    steps:
+      - name: Comprobar la confirmacion
+        run: |
+          if [[ "$CONFIRMATION" != "$CLUSTER_NAME" ]]; then
+            echo "La confirmacion debe coincidir con el nombre del cluster." >&2
+            exit 1
+          fi
+
+      - name: Obtener la configuracion del ambiente
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Autenticar en AWS
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_SANDBOX_OPERATOR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SANDBOX_OPERATOR_SECRET_ACCESS_KEY }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          force-skip-oidc: true
+
+      - name: Preparar Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Inicializar Terraform
+        run: terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" init -lockfile=readonly
+
+      - name: Preparar y comprobar el plan de retirada
+        run: |
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" plan -destroy \
+            -lock-timeout=5m -out="$RUNNER_TEMP/down.tfplan"
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" show \
+            -json "$RUNNER_TEMP/down.tfplan" > "$RUNNER_TEMP/down.json"
+
+          python3 - "$RUNNER_TEMP/down.json" "$CLUSTER_NAME" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              plan = json.load(source)
+
+          blocked = [
+              resource["address"]
+              for resource in plan.get("resource_changes", [])
+              if resource["mode"] == "managed" and (
+                  not resource["address"].startswith(("module.eks.", "module.network."))
+                  or resource["type"].startswith("aws_iam_")
+                  or resource["change"]["actions"] not in (["delete"], ["no-op"])
+                  or (
+                      resource["type"] == "aws_eks_cluster"
+                      and resource["change"]["before"]["name"] != sys.argv[2]
+                  )
+              )
+          ]
+
+          if blocked:
+              raise SystemExit("Plan de retirada no permitido: " + ", ".join(blocked))
+          PY
+
+      - name: Aplicar la retirada
+        timeout-minutes: 60
+        run: |
+          terraform -chdir="$ENVIRONMENT_DIR/terraform/temporary" apply \
+            -lock-timeout=5m "$RUNNER_TEMP/down.tfplan"
+          echo "Retirada Terraform completada para $CLUSTER_NAME." >> "$GITHUB_STEP_SUMMARY"

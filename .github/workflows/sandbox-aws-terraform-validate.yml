@@ -1,19 +1,21 @@
-name: Validar Terraform
+name: Sandbox AWS - Validar Terraform
 
 on:
   push:
     branches:
       - main
     paths:
-      - "foundation/terraform/**"
-      - "clusters/sandbox/terraform/**"
-      - ".github/workflows/validate-terraform.yml"
+      - "environments/sandbox/aws/shared/terraform/**"
+      - "environments/sandbox/aws/eks-argocd/terraform/persistent/**"
+      - "environments/sandbox/aws/eks-argocd/terraform/temporary/**"
+      - ".github/workflows/sandbox-aws-terraform-validate.yml"
 
   pull_request:
     paths:
-      - "foundation/terraform/**"
-      - "clusters/sandbox/terraform/**"
-      - ".github/workflows/validate-terraform.yml"
+      - "environments/sandbox/aws/shared/terraform/**"
+      - "environments/sandbox/aws/eks-argocd/terraform/persistent/**"
+      - "environments/sandbox/aws/eks-argocd/terraform/temporary/**"
+      - ".github/workflows/sandbox-aws-terraform-validate.yml"
 
   workflow_dispatch:
 
@@ -30,8 +32,9 @@ jobs:
       fail-fast: false
       matrix:
         directory:
-          - foundation/terraform
-          - clusters/sandbox/terraform
+          - environments/sandbox/aws/shared/terraform
+          - environments/sandbox/aws/eks-argocd/terraform/persistent
+          - environments/sandbox/aws/eks-argocd/terraform/temporary
 
     defaults:
       run:

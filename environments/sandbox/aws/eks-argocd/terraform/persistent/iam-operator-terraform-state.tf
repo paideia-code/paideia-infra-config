@@ -13,7 +13,7 @@ resource "aws_iam_policy" "sandbox_state_access" {
           "s3:ListBucket",
           "s3:GetBucketLocation"
         ]
-        Resource = aws_s3_bucket.terraform_state.arn
+        Resource = data.aws_s3_bucket.terraform_state.arn
       },
       {
         Sid    = "ReadWriteSandboxState"
@@ -22,7 +22,7 @@ resource "aws_iam_policy" "sandbox_state_access" {
           "s3:GetObject",
           "s3:PutObject"
         ]
-        Resource = "${aws_s3_bucket.terraform_state.arn}/clusters/sandbox/terraform.tfstate"
+        Resource = "${data.aws_s3_bucket.terraform_state.arn}/clusters/sandbox/terraform.tfstate"
       },
       {
         Sid    = "ManageSandboxStateLock"
@@ -32,7 +32,7 @@ resource "aws_iam_policy" "sandbox_state_access" {
           "s3:PutObject",
           "s3:DeleteObject"
         ]
-        Resource = "${aws_s3_bucket.terraform_state.arn}/clusters/sandbox/terraform.tfstate.tflock"
+        Resource = "${data.aws_s3_bucket.terraform_state.arn}/clusters/sandbox/terraform.tfstate.tflock"
       }
     ]
   })

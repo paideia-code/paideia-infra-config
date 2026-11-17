@@ -36,7 +36,7 @@ resource "aws_iam_user_policy" "ecr_publisher" {
           "ecr:DescribeImages"
         ]
         Resource = [
-          for repository in module.container_registries :
+          for repository in aws_ecr_repository.applications :
           repository.arn
         ]
       }

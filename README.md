@@ -1,44 +1,30 @@
-# Paideia Infra Environments
+# paideia-infra-config
 
-Aquí viven las composiciones concretas de los ambientes de Paideia: qué recursos
-usan, qué aplicaciones se habilitan y qué versiones queremos ejecutar.
+Configuración de infraestructura y despliegues de Paideia, organizada por entorno. Contiene escenarios de aprendizaje, sus recursos y los procedimientos concretos para operarlos. El código de las aplicaciones permanece en sus propios repositorios.
 
-Para entender el proyecto completo, empieza por la
-**[vista general de la plataforma](../paideia-infra-platform/README.md)**.
+Los ejemplos de terminal usan Bash: Linux/macOS, Git Bash o WSL en Windows. Las rutas son relativas a la raíz del repositorio, salvo que se indique otra carpeta.
 
-## Implementado hoy
+## Entornos
 
-El [POC AWS en local-aws](pocs/paideia-poc-aws-microservices/local-aws/README.md)
-contiene el laboratorio Compose/Floci y su Terraform: ECR, PostgreSQL, mensajería,
-EC2 de estudio y Courses en ECS con ALB. Sus recursos son emulados y su estado
-es independiente de cualquier cuenta AWS real.
+| Entorno | Propósito | Guía |
+| --- | --- | --- |
+| **Local / Kubernetes** | Ejecutar aplicaciones en un clúster local, gestionadas con Argo CD y App of Apps. | [Kubernetes local](environments/local/kubernetes/README.md) |
+| **Local / Floci / AWS / ECS** | Practicar Courses en ECS con ALB y dependencias AWS emuladas con Floci. | [Laboratorio Floci](environments/local/floci/aws/ecs/paideia-poc-microservices-nest/README.md) |
+| **Sandbox / AWS / EKS + Argo CD** | Crear y retirar un entorno AWS real y desplegar aplicaciones desde Git. | [Sandbox AWS](environments/sandbox/aws/README.md) |
 
-La guía conserva el recorrido completo con Compose y diferencia la ampliación
-ECS. Floci Dash permite inspeccionar los recursos emulados.
+## Responsabilidades
 
-## Diseño pendiente de implementación
-
-| Ubicación prevista | Responsabilidad |
+| Repositorio | Contenido |
 | --- | --- |
-| `foundation/terraform/` | Base conservada entre sesiones: backend, identidad CI, registro |
-| `clusters/local/` | Bootstrap y aplicaciones del Kubernetes local |
-| `clusters/sandbox/` | EKS temporal, política del ambiente y registro de aplicaciones |
-| `pocs/<proyecto>/kubernetes/local/` | Valores/versiones del proyecto en local |
-| `pocs/<proyecto>/kubernetes/sandbox/` | Valores/versiones del proyecto en AWS |
-| `.github/workflows/` | Validación, promoción, creación y retirada del ambiente |
+| **paideia-infra-config** | Recursos y aplicaciones concretos, más los workflows específicos de cada escenario. |
+| **paideia-infra-automations** | Tareas reutilizables de GitHub Actions para validar aplicaciones, construir imágenes y comprobar identidades AWS. |
 
-Estas rutas no son comandos ni una implementación ya disponible. La estructura
-completa y sus límites están en [Arquitectura](../paideia-infra-platform/docs/arquitectura.md).
+Los procedimientos de este repositorio se describen en [Workflows de infraestructura](.github/workflows/README.md). Las guías de cada capa explican sus recursos, dependencias y forma de ejecución.
 
-## Reglas principales
+## Recorrido recomendado
 
-- Una aplicación puede provenir de un repositorio propio o de un monorepo.
-- `main` puede construir/promover sin crear EKS si el ambiente está retirado.
-- Terraform administra AWS; Argo CD administrará los recursos Kubernetes elegidos.
-- La base conservada y el clúster temporal tendrán estados Terraform separados.
-- Estados, credenciales y valores privados no van a Git.
-- El apagado remoto requiere liberar recursos externos y comprobar qué permanece.
+1. Leer la [vista general de sandbox AWS](environments/sandbox/aws/README.md).
+2. Recorrer las capas en orden: `shared` → `persistent` → `temporary` → `argocd` → `applications`.
+3. Revisar los workflows que coordinan el arranque y la retirada.
 
-Consulta [Despliegues](../paideia-infra-platform/docs/despliegues.md),
-[Ciclo de vida](../paideia-infra-platform/docs/ciclo-de-vida.md) y
-[Costos](../paideia-infra-platform/docs/costos.md) según la operación que necesites.
+Se versionan configuración, documentación y `.terraform.lock.hcl`. Los estados, planes guardados, cachés y archivos con secretos permanecen fuera de Git.

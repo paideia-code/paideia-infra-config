@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paideia-template-nest-layered
+  namespace: paideia-template-nest-layered
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paideia-template-nest-layered
+  template:
+    metadata:
+      labels:
+        app: paideia-template-nest-layered
+    spec:
+      containers:
+      - name: application
+        image: 689060328245.dkr.ecr.us-east-2.amazonaws.com/paideia-template-nest-layered:sha-7ee725942a336c7df85e9df82dda121426e0ad3e
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+        env:
+        - name: PORT
+          value: '3000'
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5

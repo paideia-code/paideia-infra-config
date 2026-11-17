@@ -1,4 +1,4 @@
-name: Comprobar identidad de sandbox
+name: Sandbox AWS / EKS + Argo CD - Comprobar identidad
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     if: github.ref == 'refs/heads/main'
-    uses: paideia-code/paideia-infra-automations/.github/workflows/aws-check-identity.yml@v0.6.0
+    uses: paideia-code/paideia-infra-automations/.github/workflows/aws-identity-check.yml@v0.9.0
     with:
       aws-region: ${{ vars.AWS_REGION }}
       aws-account-id: ${{ vars.AWS_ACCOUNT_ID }}
