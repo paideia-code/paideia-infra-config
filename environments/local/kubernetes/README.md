@@ -9,11 +9,11 @@ Entorno para ejecutar aplicaciones en el Kubernetes de Docker Desktop, con conte
 
 ## Ejecución
 
-Requisitos: Docker Desktop con Kubernetes habilitado, `kubectl` y Helm. Ejecutar los comandos desde la raíz de `paideia-infra-config`.
+Requisitos: Docker Desktop con Kubernetes habilitado, `kubectl` y Helm. Ejecutar los comandos desde la raíz de `paideia-infra-config`. Los ejemplos con variables utilizan Bash (Linux/macOS, Git Bash o WSL en Windows).
 
 1. **Iniciar Kubernetes local.** Abrir Docker Desktop y esperar a que este comando muestre el nodo en estado `Ready`:
 
-   ```powershell
+   ```bash
    kubectl --context docker-desktop get nodes
    ```
 
@@ -33,7 +33,7 @@ Requisitos: Docker Desktop con Kubernetes habilitado, `kubectl` y Helm. Ejecutar
 
 Después de instalar Argo CD, ejecutar en una terminal y mantenerla abierta:
 
-```powershell
+```bash
 kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 20443:443
 ```
 
@@ -47,11 +47,11 @@ Abrir [https://localhost:20443](https://localhost:20443) y aceptar el certificad
 
 Después de desplegar una aplicación, abrir otra terminal. Sustituir las variables por su namespace, el nombre de su Service y el puerto declarado en `spec.ports[].port` del Service:
 
-```powershell
-$appNamespace = "mi-aplicacion"
-$appService = "mi-aplicacion"
-$appServicePort = 3000
-kubectl --context docker-desktop -n $appNamespace port-forward "svc/$appService" "23000:${appServicePort}"
+```bash
+APP_NAMESPACE="mi-aplicacion"
+APP_SERVICE="mi-aplicacion"
+APP_SERVICE_PORT=3000
+kubectl --context docker-desktop -n "$APP_NAMESPACE" port-forward "svc/$APP_SERVICE" "23000:$APP_SERVICE_PORT"
 ```
 
 Mantener la terminal abierta. Para una aplicación HTTP, acceder a `http://localhost:23000` y a la ruta que exponga. Usar un puerto local libre entre `20000` y `29999` para cada túnel simultáneo.
